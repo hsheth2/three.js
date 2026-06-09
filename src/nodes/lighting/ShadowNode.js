@@ -720,6 +720,25 @@ class ShadowNode extends ShadowBaseNode {
 	 */
 	updateShadow( frame ) {
 
+		const ownerInstanceId = this.light && this.light.userData ? this.light.userData.approximateLightOwnerInstanceId : undefined;
+		const ownerMuted = [];
+		if ( typeof ownerInstanceId === 'string' && ownerInstanceId.length > 0 ) {
+
+			frame.scene.traverse( ( obj ) => {
+
+				if ( obj.isMesh === true && obj.castShadow === true && obj.userData && obj.userData.approximateLightShadowOwnerInstanceId === ownerInstanceId ) {
+
+					obj.castShadow = false;
+					ownerMuted.push( obj );
+
+				}
+
+			} );
+
+		}
+
+		try {
+
 		const { shadowMap, light, shadow } = this;
 		const { renderer, scene, camera } = frame;
 
@@ -766,6 +785,12 @@ class ShadowNode extends ShadowBaseNode {
 		shadow.camera.layers.mask = _shadowCameraLayer;
 
 		restoreRendererAndSceneState( renderer, scene, _rendererState );
+
+		} finally {
+
+			for ( const mesh of ownerMuted ) mesh.castShadow = true;
+
+		}
 
 	}
 
