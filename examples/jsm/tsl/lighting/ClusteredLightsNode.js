@@ -231,6 +231,19 @@ class ClusteredLightsNode extends LightsNode {
 
 	}
 
+	getLights() {
+
+		// The renderer's per-render light save/restore (Lighting.beginRender /
+		// finishRender) snapshots getLights() and replays it through
+		// setLights(). The base implementation only returns the material
+		// lights, so every restore silently dropped the clustered point
+		// lights and left the node's GPU inputs (light count, z-slice
+		// ranges) inconsistent with its light arrays. Return the full set so
+		// the save/restore round-trips.
+		return [ ...this.clusteredLights, ...this.materialLights ];
+
+	}
+
 	getBlock() {
 
 		return this._lightIndexes.element( this._screenClusterIndex.mul( int( this._chunksPerCluster ) ) );
