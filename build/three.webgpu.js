@@ -59807,8 +59807,17 @@ class Renderer {
 
 		//
 
-		renderContext.depth = this.depth;
-		renderContext.stencil = this.stencil;
+		if ( renderTarget !== null ) {
+
+			renderContext.depth = renderTarget.depthBuffer;
+			renderContext.stencil = renderTarget.stencilBuffer;
+
+		} else {
+
+			renderContext.depth = this.depth;
+			renderContext.stencil = this.stencil;
+
+		}
 
 		if ( ! renderContext.clippingContext ) renderContext.clippingContext = new ClippingContext();
 		renderContext.clippingContext.updateGlobal( sceneRef, camera );
@@ -59867,11 +59876,21 @@ class Renderer {
 
 			renderContext.textures = renderTargetData.textures;
 			renderContext.depthTexture = renderTargetData.depthTexture;
+			renderContext.width = renderTargetData.width;
+			renderContext.height = renderTargetData.height;
+			renderContext.renderTarget = renderTarget;
+			renderContext.depth = renderTarget.depthBuffer;
+			renderContext.stencil = renderTarget.stencilBuffer;
 
 		} else {
 
 			renderContext.textures = null;
 			renderContext.depthTexture = null;
+			renderContext.width = _drawingBufferSize.width;
+			renderContext.height = _drawingBufferSize.height;
+			renderContext.renderTarget = null;
+			renderContext.depth = this.depth;
+			renderContext.stencil = this.stencil;
 
 		}
 
