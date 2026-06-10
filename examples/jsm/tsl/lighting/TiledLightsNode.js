@@ -97,7 +97,7 @@ class TiledLightsNode extends LightsNode {
 		this._lightsTexture = null;
 
 		this._lightsCount = uniform( 0, 'int' );
-		this._tileLightCount = 8;
+		this._tileLightCount = 32;
 		this._screenSize = uniform( new Vector2() );
 		this._cameraProjectionMatrix = uniform( 'mat4' );
 		this._cameraViewMatrix = uniform( 'mat4' );
@@ -108,7 +108,10 @@ class TiledLightsNode extends LightsNode {
 
 	customCacheKey() {
 
-		return this._compute.getCacheKey() + super.customCacheKey();
+		// `_compute` is null until the first `updateProgram()`; render objects
+		// query the lights-node cache key before that on the first frame. Same
+		// guard as upstream ClusteredLightsNode.customCacheKey.
+		return ( this._compute !== null ? this._compute.getCacheKey() : 0 ) + super.customCacheKey();
 
 	}
 
@@ -176,7 +179,7 @@ class TiledLightsNode extends LightsNode {
 
 		for ( const light of lights ) {
 
-			if ( light.isPointLight === true ) {
+			if ( light.isPointLight === true && light.castShadow !== true ) {
 
 				tiledLights[ tiledIndex ++ ] = light;
 
@@ -197,7 +200,7 @@ class TiledLightsNode extends LightsNode {
 
 	getBlock( block = 0 ) {
 
-		return this._lightIndexes.element( this._screenTileIndex.mul( int( 2 ).add( int( block ) ) ) );
+		return this._lightIndexes.element( this._screenTileIndex.mul( int( 8 ).add( int( block ) ) ) );
 
 	}
 
@@ -207,7 +210,7 @@ class TiledLightsNode extends LightsNode {
 
 		const stride = int( 4 );
 		const tileOffset = element.div( stride );
-		const tileIndex = this._screenTileIndex.mul( int( 2 ) ).add( tileOffset );
+		const tileIndex = this._screenTileIndex.mul( int( 8 ) ).add( tileOffset );
 
 		return this._lightIndexes.element( tileIndex ).element( element.mod( stride ) );
 
@@ -332,14 +335,14 @@ class TiledLightsNode extends LightsNode {
 		const lightsData = new Float32Array( maxLights * 4 * 2 ); // 2048 lights, 4 elements(rgba), 2 components, 1 component per line (position, distance, color, decay)
 		const lightsTexture = new DataTexture( lightsData, lightsData.length / 8, 2, RGBAFormat, FloatType );
 
-		const lightIndexesArray = new Int32Array( count * 4 * 2 );
+		const lightIndexesArray = new Int32Array( count * 4 * 8 );
 		const lightIndexes = attributeArray( lightIndexesArray, 'ivec4' ).setName( 'lightIndexes' );
 
 		// compute
 
 		const getBlock = ( index ) => {
 
-			const tileIndex = instanceIndex.mul( int( 2 ) ).add( int( index ) );
+			const tileIndex = instanceIndex.mul( int( 8 ) ).add( int( index ) );
 
 			return lightIndexes.element( tileIndex );
 
@@ -351,7 +354,7 @@ class TiledLightsNode extends LightsNode {
 
 			const stride = int( 4 );
 			const tileOffset = elementIndex.div( stride );
-			const tileIndex = instanceIndex.mul( int( 2 ) ).add( tileOffset );
+			const tileIndex = instanceIndex.mul( int( 8 ) ).add( tileOffset );
 
 			return lightIndexes.element( tileIndex ).element( elementIndex.mod( stride ) );
 
@@ -374,8 +377,11 @@ class TiledLightsNode extends LightsNode {
 
 			const index = int( 0 ).toVar();
 
-			getBlock( 0 ).assign( ivec4( 0 ) );
-			getBlock( 1 ).assign( ivec4( 0 ) );
+			for ( let block = 0; block < 8; block ++ ) {
+
+				getBlock( block ).assign( ivec4( 0 ) );
+
+			}
 
 			Loop( this.maxLights, ( { i } ) => {
 
@@ -391,8 +397,11 @@ class TiledLightsNode extends LightsNode {
 				const ndc = projectedPosition.div( projectedPosition.w );
 				const screenPosition = ndc.xy.mul( 0.5 ).add( 0.5 ).flipY();
 
-				const distanceFromCamera = viewPosition.z;
-				const pointRadius = distance.div( distanceFromCamera );
+				const distanceFromCamera = viewPosition.z.negate();
+				const projectionScaleX = cameraProjectionMatrix.element( 0 ).element( 0 );
+				const projectionScaleY = cameraProjectionMatrix.element( 1 ).element( 1 );
+				const projectionScale = projectionScaleX.max( projectionScaleY ).mul( float( 0.5 ) );
+				const pointRadius = distance.mul( projectionScale ).div( distanceFromCamera );
 
 				If( circleIntersectsAABB( screenPosition, pointRadius, minBounds, maxBounds ), () => {
 
