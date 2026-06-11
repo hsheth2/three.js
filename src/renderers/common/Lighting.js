@@ -28,12 +28,24 @@ class Lighting {
 		this.enabled = true;
 
 		/**
-		 * A stack of light arrays saved per render via {@link Lighting#beginRender}.
+		 * A stack of light arrays saved per re-entered render via
+		 * {@link Lighting#beginRender}.
 		 *
 		 * @private
 		 * @type {Array<Array<Light>>}
 		 */
 		this._cache = [];
+
+		/**
+		 * Per-scene render re-entrancy depth. Save/restore only applies when a
+		 * scene's render is re-entered (reflections, shadow maps rendering the
+		 * same scene), since only then has the outer render already assigned
+		 * this frame's lights to the node.
+		 *
+		 * @private
+		 * @type {WeakMap<Object3D, number>}
+		 */
+		this._sceneDepth = new WeakMap();
 
 	}
 
@@ -85,7 +97,15 @@ class Lighting {
 	 */
 	beginRender( scene ) {
 
-		this._cache.push( this.getNode( scene ).getLights() );
+		const depth = this._sceneDepth.get( scene ) || 0;
+		this._sceneDepth.set( scene, depth + 1 );
+
+		// On the first render of a scene this frame, the node still holds a
+		// previous frame's lights — the render list assigns the current set
+		// later in the render. Saving (and then restoring) that stale state
+		// would desync the node from its GPU-side data after any runtime
+		// light-set change, so only re-entered renders snapshot.
+		if ( depth > 0 ) this._cache.push( this.getNode( scene ).getLights() );
 
 	}
 
@@ -96,7 +116,10 @@ class Lighting {
 	 */
 	finishRender( scene ) {
 
-		this.getNode( scene ).setLights( this._cache.pop() );
+		const depth = ( this._sceneDepth.get( scene ) || 1 ) - 1;
+		this._sceneDepth.set( scene, depth );
+
+		if ( depth > 0 ) this.getNode( scene ).setLights( this._cache.pop() );
 
 	}
 
