@@ -82106,9 +82106,16 @@ class WebGPUPipelineUtils {
 
 					let asyncError = null;
 
+					const pipelinePromise = device.createRenderPipelineAsync( _renderPipelineDescriptor );
+
+					// The device consumed the descriptor synchronously; reset it before
+					// suspending so an interleaved synchronous pipeline creation cannot
+					// inherit this pipeline's depth/stencil state.
+					_renderPipelineDescriptor.reset();
+
 					try {
 
-						pipelineData.pipeline = await device.createRenderPipelineAsync( _renderPipelineDescriptor );
+						pipelineData.pipeline = await pipelinePromise;
 
 					} catch ( err ) {
 
@@ -82130,8 +82137,6 @@ class WebGPUPipelineUtils {
 					}
 
 				} finally {
-
-					_renderPipelineDescriptor.reset();
 
 					// Guarantee resolution so `compileAsync`'s Promise.all cannot hang on an
 					// unexpected throw from any await above.
