@@ -231,6 +231,12 @@ class ClusteredLightsNode extends LightsNode {
 
 	}
 
+	getLights() {
+
+		return [ ...this.clusteredLights, ...this.materialLights ];
+
+	}
+
 	getBlock() {
 
 		return this._lightIndexes.element( this._screenClusterIndex.mul( int( this._chunksPerCluster ) ) );
