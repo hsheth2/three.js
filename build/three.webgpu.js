@@ -82141,6 +82141,15 @@ class WebGPUPipelineUtils {
 
 			} );
 
+			// `createRenderPipelineAsync` converts the descriptor synchronously at
+			// call time (inside the Promise executor above), but the `finally`
+			// reset only runs after the await settles. Reset here as well so a
+			// synchronous pipeline creation that interleaves before then cannot
+			// inherit this pipeline's conditional state (`depthStencil` is only
+			// written when the context has a depth/stencil aspect, so a stale
+			// value would attach a depth state to a depthless pipeline).
+			_renderPipelineDescriptor.reset();
+
 			promises.push( p );
 
 		}
